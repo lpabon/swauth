@@ -843,6 +843,13 @@ class Swauth(object):
         if resp.status_int // 100 != 2 and resp.status_int != 404:
             raise Exception('Could not delete account id mapping: %s %s' %
                             (path, resp.status))
+        # Delete .services
+        path = quote('/v1/%s/%s/.services' % (self.auth_account, account))
+        resp = self.make_pre_authed_request(
+            req.environ, 'DELETE', path).get_response(self.app)
+        if resp.status_int // 100 != 2 and resp.status_int != 404:
+            raise Exception('Could not delete .services object: %s %s' %
+                            (path, resp.status))
         # Delete the account marker itself.
         path = quote('/v1/%s/%s' % (self.auth_account, account))
         resp = self.make_pre_authed_request(
