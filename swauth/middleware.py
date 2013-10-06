@@ -835,38 +835,6 @@ class Swauth(object):
         if resp.status_int // 100 != 2 and resp.status_int != 404:
             raise Exception('Could not obtain .services object: %s %s' %
                             (path, resp.status))
-        if resp.status_int // 100 == 2:
-            services = json.loads(resp.body)
-            # Delete the account on each cluster it is on.
-            deleted_any = False
-            for name, url in services['storage'].iteritems():
-                if name != 'default':
-                    parsed = urlparse(url)
-                    conn = self.get_conn(parsed)
-                    conn.request('DELETE', parsed.path,
-                        headers={'X-Auth-Token': self.get_itoken(req.environ)})
-                    resp = conn.getresponse()
-                    resp.read()
-                    if resp.status == 409:
-                        if deleted_any:
-                            raise Exception('Managed to delete one or more '
-                                'service end points, but failed with: '
-                                '%s %s %s' % (url, resp.status, resp.reason))
-                        else:
-                            return HTTPConflict(request=req)
-                    if resp.status // 100 != 2 and resp.status != 404:
-                        raise Exception('Could not delete account on the '
-                            'Swift cluster: %s %s %s' %
-                            (url, resp.status, resp.reason))
-                    deleted_any = True
-            # Delete the .services object itself.
-            path = quote('/v1/%s/%s/.services' %
-                         (self.auth_account, account))
-            resp = self.make_pre_authed_request(
-                req.environ, 'DELETE', path).get_response(self.app)
-            if resp.status_int // 100 != 2 and resp.status_int != 404:
-                raise Exception('Could not delete .services object: %s %s' %
-                                (path, resp.status))
         # Delete the account id mapping for the account.
         path = quote('/v1/%s/.account_id/%s' %
                      (self.auth_account, account_id))
