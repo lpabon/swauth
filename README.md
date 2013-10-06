@@ -17,6 +17,7 @@ NOTE
 
 Quick Install
 -------------
+0) Install glusterfs, gluster-swift, and python-swiftclient
 
 1) Install Swauth with ``sudo python setup.py install`` or ``sudo python
    setup.py develop`` or via whatever packaging system you may be using.
@@ -40,20 +41,22 @@ Quick Install
     set log_name = swauth
     super_admin_key = swauthkey
 
-4) Be sure your proxy server allows account management:
+4) In gluster-swift, be sure your proxy server does not allow account management:
 
     [app:proxy-server]
     ...
-    allow_account_management = true
+    allow_account_management = false
 
-5) Restart your proxy server ``swift-init proxy reload``
+5) Crate a GlusterFS volume called ``.auth``, used to save all authentication metadata
 
-6) Initialize the Swauth backing store in Swift ``swauth-prep -K swauthkey``
+6) Restart your proxy server ``swift-init proxy reload``
 
-7) Add an account/user ``swauth-add-user -A http://127.0.0.1:8080/auth/ -K
+7) Initialize the Swauth backing store in Swift ``swauth-prep -K swauthkey``
+
+8) Add an account/user ``swauth-add-user -A http://127.0.0.1:8080/auth/ -K
    swauthkey -a test tester testing``
 
-8) Ensure it works ``swift -A http://127.0.0.1:8080/auth/v1.0 -U test:tester -K
+9) Ensure it works ``swift -A http://127.0.0.1:8080/auth/v1.0 -U test:tester -K
    testing stat -v``
 
 

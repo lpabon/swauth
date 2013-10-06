@@ -39,7 +39,7 @@ test_print "Get stat on test using tester:testing"
 swift -A http://127.0.0.1:8080/auth/v1.0 -U test:tester -K testing stat || fail "Unable to get stat" 
 
 test_print "Creating myuser:mypassword for newaccount, which automatically creates account newaccount"
-swauth-add-user -A http://127.0.0.1:8080/auth/ -K swauthkey -a newaccount myuser mypassword
+swauth-add-user -A http://127.0.0.1:8080/auth/ -K swauthkey -a newaccount myuser mypassword || fail "Unable to create user"
 
 test_print "Get stat on newaccount myuser:mypassword"
 swift -A http://127.0.0.1:8080/auth/v1.0 -U newaccount:myuser -K mypassword stat || fail "Unable to get stat" 
