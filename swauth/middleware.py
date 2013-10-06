@@ -764,32 +764,9 @@ class Swauth(object):
         else:
             raise Exception('Could not verify account within main auth '
                 'account: %s %s' % (path, resp.status))
-        account_suffix = req.headers.get('x-account-suffix')
-        if not account_suffix:
-            account_suffix = str(uuid4())
-        # Create the new account in the Swift cluster
-        path = quote('%s/%s%s' % (self.dsc_parsed2.path,
-                                  self.reseller_prefix, account_suffix))
-        try:
-            conn = self.get_conn()
-            conn.request('PUT', path,
-                        headers={'X-Auth-Token': self.get_itoken(req.environ),
-                                 'Content-Length': '0'})
-            resp = conn.getresponse()
-            resp.read()
-            if resp.status // 100 != 2:
-                raise Exception('Could not create account on the Swift '
-                    'cluster: %s %s %s' % (path, resp.status, resp.reason))
-        except (Exception, TimeoutError):
-            self.logger.error(_('ERROR: Exception while trying to communicate '
-                'with %(scheme)s://%(host)s:%(port)s/%(path)s'),
-                {'scheme': self.dsc_parsed2.scheme,
-                 'host': self.dsc_parsed2.hostname,
-                 'port': self.dsc_parsed2.port, 'path': path})
-            raise
         # Record the mapping from account id back to account name
         path = quote('/v1/%s/.account_id/%s%s' %
-                     (self.auth_account, self.reseller_prefix, account_suffix))
+                     (self.auth_account, self.reseller_prefix, account))
         resp = self.make_pre_authed_request(
             req.environ, 'PUT', path, account).get_response(self.app)
         if resp.status_int // 100 != 2:
@@ -799,7 +776,7 @@ class Swauth(object):
         path = quote('/v1/%s/%s/.services' % (self.auth_account, account))
         services = {'storage': {}}
         services['storage'][self.dsc_name] = '%s/%s%s' % (self.dsc_url,
-            self.reseller_prefix, account_suffix)
+            self.reseller_prefix, account)
         services['storage']['default'] = self.dsc_name
         resp = self.make_pre_authed_request(
             req.environ, 'PUT', path,
@@ -812,7 +789,7 @@ class Swauth(object):
         resp = self.make_pre_authed_request(
             req.environ, 'POST', path,
             headers={'X-Container-Meta-Account-Id': '%s%s' % (
-                self.reseller_prefix, account_suffix)}).get_response(self.app)
+                self.reseller_prefix, account)}).get_response(self.app)
         if resp.status_int // 100 != 2:
             raise Exception('Could not record the account id on the account: '
                             '%s %s' % (path, resp.status))
