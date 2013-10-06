@@ -47,7 +47,7 @@ Quick Install
     ...
     allow_account_management = false
 
-5) Crate a GlusterFS volume called ``.auth``, used to save all authentication metadata
+5) Create a GlusterFS volume called ``.auth``, used to save all authentication metadata
 
 6) Restart your proxy server ``swift-init proxy reload``
 
