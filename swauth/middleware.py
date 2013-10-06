@@ -541,12 +541,6 @@ class Swauth(object):
         """
         if not self.is_super_admin(req):
             return HTTPForbidden(request=req)
-        path = quote('/v1/%s' % self.auth_account)
-        resp = self.make_pre_authed_request(
-            req.environ, 'PUT', path).get_response(self.app)
-        if resp.status_int // 100 != 2:
-            raise Exception('Could not create the main auth account: %s %s' %
-                            (path, resp.status))
         path = quote('/v1/%s/.account_id' % self.auth_account)
         resp = self.make_pre_authed_request(
             req.environ, 'PUT', path).get_response(self.app)
