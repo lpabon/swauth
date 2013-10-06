@@ -541,12 +541,6 @@ class Swauth(object):
         """
         if not self.is_super_admin(req):
             return HTTPForbidden(request=req)
-        path = quote('/v1/%s' % self.auth_account)
-        resp = self.make_pre_authed_request(
-            req.environ, 'PUT', path).get_response(self.app)
-        if resp.status_int // 100 != 2:
-            raise Exception('Could not create the main auth account: %s %s' %
-                            (path, resp.status))
         path = quote('/v1/%s/.account_id' % self.auth_account)
         resp = self.make_pre_authed_request(
             req.environ, 'PUT', path).get_response(self.app)
@@ -764,32 +758,9 @@ class Swauth(object):
         else:
             raise Exception('Could not verify account within main auth '
                 'account: %s %s' % (path, resp.status))
-        account_suffix = req.headers.get('x-account-suffix')
-        if not account_suffix:
-            account_suffix = str(uuid4())
-        # Create the new account in the Swift cluster
-        path = quote('%s/%s%s' % (self.dsc_parsed2.path,
-                                  self.reseller_prefix, account_suffix))
-        try:
-            conn = self.get_conn()
-            conn.request('PUT', path,
-                        headers={'X-Auth-Token': self.get_itoken(req.environ),
-                                 'Content-Length': '0'})
-            resp = conn.getresponse()
-            resp.read()
-            if resp.status // 100 != 2:
-                raise Exception('Could not create account on the Swift '
-                    'cluster: %s %s %s' % (path, resp.status, resp.reason))
-        except (Exception, TimeoutError):
-            self.logger.error(_('ERROR: Exception while trying to communicate '
-                'with %(scheme)s://%(host)s:%(port)s/%(path)s'),
-                {'scheme': self.dsc_parsed2.scheme,
-                 'host': self.dsc_parsed2.hostname,
-                 'port': self.dsc_parsed2.port, 'path': path})
-            raise
         # Record the mapping from account id back to account name
         path = quote('/v1/%s/.account_id/%s%s' %
-                     (self.auth_account, self.reseller_prefix, account_suffix))
+                     (self.auth_account, self.reseller_prefix, account))
         resp = self.make_pre_authed_request(
             req.environ, 'PUT', path, account).get_response(self.app)
         if resp.status_int // 100 != 2:
@@ -799,7 +770,7 @@ class Swauth(object):
         path = quote('/v1/%s/%s/.services' % (self.auth_account, account))
         services = {'storage': {}}
         services['storage'][self.dsc_name] = '%s/%s%s' % (self.dsc_url,
-            self.reseller_prefix, account_suffix)
+            self.reseller_prefix, account)
         services['storage']['default'] = self.dsc_name
         resp = self.make_pre_authed_request(
             req.environ, 'PUT', path,
@@ -812,7 +783,7 @@ class Swauth(object):
         resp = self.make_pre_authed_request(
             req.environ, 'POST', path,
             headers={'X-Container-Meta-Account-Id': '%s%s' % (
-                self.reseller_prefix, account_suffix)}).get_response(self.app)
+                self.reseller_prefix, account)}).get_response(self.app)
         if resp.status_int // 100 != 2:
             raise Exception('Could not record the account id on the account: '
                             '%s %s' % (path, resp.status))
@@ -858,38 +829,6 @@ class Swauth(object):
         if resp.status_int // 100 != 2 and resp.status_int != 404:
             raise Exception('Could not obtain .services object: %s %s' %
                             (path, resp.status))
-        if resp.status_int // 100 == 2:
-            services = json.loads(resp.body)
-            # Delete the account on each cluster it is on.
-            deleted_any = False
-            for name, url in services['storage'].iteritems():
-                if name != 'default':
-                    parsed = urlparse(url)
-                    conn = self.get_conn(parsed)
-                    conn.request('DELETE', parsed.path,
-                        headers={'X-Auth-Token': self.get_itoken(req.environ)})
-                    resp = conn.getresponse()
-                    resp.read()
-                    if resp.status == 409:
-                        if deleted_any:
-                            raise Exception('Managed to delete one or more '
-                                'service end points, but failed with: '
-                                '%s %s %s' % (url, resp.status, resp.reason))
-                        else:
-                            return HTTPConflict(request=req)
-                    if resp.status // 100 != 2 and resp.status != 404:
-                        raise Exception('Could not delete account on the '
-                            'Swift cluster: %s %s %s' %
-                            (url, resp.status, resp.reason))
-                    deleted_any = True
-            # Delete the .services object itself.
-            path = quote('/v1/%s/%s/.services' %
-                         (self.auth_account, account))
-            resp = self.make_pre_authed_request(
-                req.environ, 'DELETE', path).get_response(self.app)
-            if resp.status_int // 100 != 2 and resp.status_int != 404:
-                raise Exception('Could not delete .services object: %s %s' %
-                                (path, resp.status))
         # Delete the account id mapping for the account.
         path = quote('/v1/%s/.account_id/%s' %
                      (self.auth_account, account_id))
@@ -897,6 +836,13 @@ class Swauth(object):
             req.environ, 'DELETE', path).get_response(self.app)
         if resp.status_int // 100 != 2 and resp.status_int != 404:
             raise Exception('Could not delete account id mapping: %s %s' %
+                            (path, resp.status))
+        # Delete .services
+        path = quote('/v1/%s/%s/.services' % (self.auth_account, account))
+        resp = self.make_pre_authed_request(
+            req.environ, 'DELETE', path).get_response(self.app)
+        if resp.status_int // 100 != 2 and resp.status_int != 404:
+            raise Exception('Could not delete .services object: %s %s' %
                             (path, resp.status))
         # Delete the account marker itself.
         path = quote('/v1/%s/%s' % (self.auth_account, account))
